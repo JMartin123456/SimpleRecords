@@ -77,19 +77,19 @@ Invoke-RestMethod -Method Post -Uri "http://localhost:5227/api/import/employees"
 
 Import kontroluje duplicity a platnosť dátumov a IP adries. Ak sa pracovná pozícia zamestnanca nenájde, zamestnanec môže byť importovaný bez pracovnej pozície.
 
-## Import files
+## Importné súbory
 
-The JSON import files are excluded from the Git repository because they may contain sensitive or personal data.
+Súbory JSON používané na import nie sú zahrnuté v Git repozitári, pretože môžu obsahovať citlivé alebo osobné údaje.
 
-To use the import functionality locally:
+Ak chceš používať funkciu importu lokálne:
 
-1. Create the `SimpleRecords.Server/ImportFiles/` directory if it does not exist.
-2. Add your own `employes.json` and `postions.json` files to that directory.
-3. Make sure the files follow the JSON structure expected by the application.
+1. Vytvor priečinok `SimpleRecords.Server/ImportFiles/`, ak ešte neexistuje.
+2. Vlož doň vlastné súbory `employes.json` a `postions.json`.
+3. Uisti sa, že súbory majú správnu štruktúru JSON, ktorú aplikácia očakáva.
 
-These files are excluded via `.gitignore` and should not be committed to the repository.
+Tieto súbory sú vylúčené z Git repozitára pomocou `.gitignore` a nemali by sa nahrávať na GitHub.
 
-**Note:** The import JSON files are not included in this repository. You must provide your own files locally.
+**Poznámka:** Importné súbory JSON nie sú súčasťou tohto repozitára. Na lokálne používanie aplikácie si musíš zabezpečiť vlastné súbory.
 
 ## Logovanie
 
