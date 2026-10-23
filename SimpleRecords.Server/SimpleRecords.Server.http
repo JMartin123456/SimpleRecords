@@ -1,0 +1,6 @@
+@SimpleRecords.Server_HostAddress = http://localhost:5227
+
+GET {{SimpleRecords.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

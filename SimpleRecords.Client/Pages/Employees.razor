@@ -1,0 +1,390 @@
+
+@page "/employees"
+@using SimpleRecords.Client.Models
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Zamestnanci</PageTitle>
+
+<h1>Zamestnanci</h1>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert alert-info" role="alert">
+        @message
+    </div>
+}
+
+@if (employees == null)
+{
+    <p>Načítavam zamestnancov...</p>
+}
+else if (employees.Length == 0)
+{
+    <p>V databáze sa nenachádzajú žiadni zamestnanci.</p>
+}
+else
+{
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Meno</th>
+                <th>Priezvisko</th>
+                <th>Akcie</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var employee in employees)
+            {
+                <tr>
+                    <td>
+                        <button type="button"
+                                class="btn btn-link p-0"
+                                @onclick="() => OpenDetails(employee)">
+                            @employee.Name
+                        </button>
+                    </td>
+                    <td>
+                        <button type="button"
+                                class="btn btn-link p-0"
+                                @onclick="() => OpenDetails(employee)">
+                            @employee.Surname
+                        </button>
+                    </td>
+                    <td>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-primary me-2"
+                                @onclick="() => EditEmployee(employee.EmployeeID)">
+                            Upraviť
+                        </button>
+
+                        <button type="button"
+                                class="btn btn-sm btn-outline-danger"
+                                @onclick="() => DeleteEmployee(employee)">
+                            Zmazať
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (selectedEmployee != null)
+{
+    <div class="modal show d-block"
+         tabindex="-1"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="employeeDetailsTitle"
+         style="background-color: rgba(0,0,0,0.5);">
+
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="employeeDetailsTitle">
+                        Detail zamestnanca
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            aria-label="Zavrieť"
+                            @onclick="CloseDetails">
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <p>
+                        <strong>Meno:</strong>
+                        @selectedEmployee.Name
+                    </p>
+
+                    <p>
+                        <strong>Priezvisko:</strong>
+                        @selectedEmployee.Surname
+                    </p>
+
+                    <p>
+                        <strong>Dátum narodenia:</strong>
+                        @(selectedEmployee.BirthDate?.ToString("dd.MM.yyyy") ?? "")
+                    </p>
+
+                    <p>
+                        <strong>Pracovná pozícia:</strong>
+                        @(selectedEmployee.PositionName ?? "Nepriradená")
+                    </p>
+
+                    <p>
+                        <strong>IP adresa:</strong>
+                        @selectedEmployee.IPaddress
+                    </p>
+
+                    <p>
+                        <strong>Kód krajiny:</strong>
+                        @(selectedEmployee.IPCountryCode ?? "Neznámy")
+                    </p>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            @onclick="CloseDetails">
+                        Zavrieť
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
+@if (editEmployee != null)
+{
+    <div class="modal show d-block"
+         tabindex="-1"
+         role="dialog"
+         aria-modal="true"
+         style="background-color: rgba(0,0,0,0.5);">
+
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <EditForm Model="editEmployee" OnValidSubmit="SaveEdit">
+                    <DataAnnotationsValidator />
+
+                    <div class="modal-header">
+                        <h5 class="modal-title">Upraviť zamestnanca</h5>
+                        <button type="button"
+                                class="btn-close"
+                                aria-label="Zavrieť"
+                                @onclick="CancelEdit">
+                        </button>
+                    </div>
+
+                    <div class="modal-body">
+                        <ValidationSummary />
+
+                        <div class="mb-3">
+                            <label class="form-label">Meno</label>
+                            <InputText class="form-control"
+                                       @bind-Value="editEmployee.Name" />
+                            <ValidationMessage For="@(() => editEmployee.Name)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Priezvisko</label>
+                            <InputText class="form-control"
+                                       @bind-Value="editEmployee.Surname" />
+                            <ValidationMessage For="@(() => editEmployee.Surname)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Dátum narodenia</label>
+                            <InputDate class="form-control"
+                                       @bind-Value="editEmployee.BirthDate" />
+                            <ValidationMessage For="@(() => editEmployee.BirthDate)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Pracovná pozícia</label>
+                            <InputSelect class="form-select"
+                                         @bind-Value="editEmployee.PositionID">
+                                <option value="">-- Vyber pozíciu --</option>
+                                @if (positions != null)
+                                {
+                                    @foreach (var position in positions)
+                                    {
+                                        <option value="@position.PositionID">
+                                            @position.PositionName
+                                        </option>
+                                    }
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="@(() => editEmployee.PositionID)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">IP adresa</label>
+                            <InputText class="form-control"
+                                       @bind-Value="editEmployee.IPaddress" />
+                            <ValidationMessage For="@(() => editEmployee.IPaddress)" />
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button"
+                                class="btn btn-secondary"
+                                @onclick="CancelEdit"
+                                disabled="@isSaving">
+                            Zrušiť
+                        </button>
+
+                        <button type="submit"
+                                class="btn btn-primary"
+                                disabled="@isSaving">
+                            @(isSaving ? "Ukladám..." : "Uložiť zmeny")
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+}
+
+
+@code {
+    private Employee[]? employees;
+    private Employee? selectedEmployee;
+    private string message = string.Empty;
+    private Employee? editEmployee;
+    private Position[]? positions;
+    private bool isSaving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployees();
+        positions = await Http.GetFromJsonAsync<Position[]>("api/positions");
+    }
+
+    private async Task LoadEmployees()
+    {
+        try
+        {
+            employees = await Http.GetFromJsonAsync<Employee[]>(
+                "api/employees");
+        }
+        catch (HttpRequestException)
+        {
+            message = "Nepodarilo sa načítať zamestnancov. Skontroluj, či server beží.";
+        }
+    }
+
+    private void OpenDetails(Employee employee)
+    {
+        selectedEmployee = employee;
+    }
+
+    private void CloseDetails()
+    {
+        selectedEmployee = null;
+    }
+
+
+    private void EditEmployee(int employeeId)
+    {
+        var employee = employees?.FirstOrDefault(
+            e => e.EmployeeID == employeeId);
+
+        if (employee == null)
+        {
+            message = "Zamestnanca sa nepodarilo nájsť.";
+            return;
+        }
+
+        editEmployee = new Employee
+        {
+            EmployeeID = employee.EmployeeID,
+            Name = employee.Name,
+            Surname = employee.Surname,
+            BirthDate = employee.BirthDate,
+            PositionID = employee.PositionID,
+            PositionName = employee.PositionName,
+            IPaddress = employee.IPaddress,
+            IPCountryCode = employee.IPCountryCode
+        };
+    }
+
+    private void CancelEdit()
+    {
+        if (!isSaving)
+        {
+            editEmployee = null;
+        }
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editEmployee == null)
+        {
+            return;
+        }
+
+        if (editEmployee.BirthDate.HasValue &&
+            editEmployee.BirthDate.Value.Date > DateTime.Today)
+        {
+            message = "Dátum narodenia nemôže byť v budúcnosti.";
+            return;
+        }
+
+        isSaving = true;
+        message = string.Empty;
+
+        try
+        {
+            var response = await Http.PutAsJsonAsync(
+                $"api/employees/{editEmployee.EmployeeID}",
+                editEmployee);
+
+            if (response.IsSuccessStatusCode)
+            {
+                message = "Zamestnanec bol úspešne upravený.";
+                selectedEmployee = null;
+                editEmployee = null;
+
+                await LoadEmployees();
+
+                await InvokeAsync(StateHasChanged);
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                message = $"Zmeny sa nepodarilo uložiť. {error}";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            message = "Nepodarilo sa spojiť so serverom.";
+        }
+        catch (Exception)
+        {
+            message = "Pri ukladaní nastala neočakávaná chyba.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+
+    private async Task DeleteEmployee(Employee employee)
+    {
+        bool confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"Naozaj chceš zmazať zamestnanca {employee.Name} {employee.Surname}?");
+
+        if (!confirmed)
+        {
+            return;
+        }
+
+        try
+        {
+            var response = await Http.DeleteAsync(
+                $"api/employees/{employee.EmployeeID}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                message = "Zamestnanec bol úspešne zmazaný.";
+                selectedEmployee = null;
+                await LoadEmployees();
+            }
+            else
+            {
+                message = "Zamestnanca sa nepodarilo zmazať.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            message = "Nepodarilo sa spojiť so serverom.";
+        }
+    }
+}

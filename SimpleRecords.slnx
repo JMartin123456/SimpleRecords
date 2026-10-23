@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SimpleRecords.Client/SimpleRecords.Client.csproj" />
+  <Project Path="SimpleRecords.Server/SimpleRecords.Server.csproj" />
+</Solution>
