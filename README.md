@@ -77,6 +77,20 @@ Invoke-RestMethod -Method Post -Uri "http://localhost:5227/api/import/employees"
 
 Import kontroluje duplicity a platnosť dátumov a IP adries. Ak sa pracovná pozícia zamestnanca nenájde, zamestnanec môže byť importovaný bez pracovnej pozície.
 
+## Import files
+
+The JSON import files are excluded from the Git repository because they may contain sensitive or personal data.
+
+To use the import functionality locally:
+
+1. Create the `SimpleRecords.Server/ImportFiles/` directory if it does not exist.
+2. Add your own `employes.json` and `postions.json` files to that directory.
+3. Make sure the files follow the JSON structure expected by the application.
+
+These files are excluded via `.gitignore` and should not be committed to the repository.
+
+**Note:** The import JSON files are not included in this repository. You must provide your own files locally.
+
 ## Logovanie
 
 Aplikácia používa Serilog na zaznamenávanie udalostí a chýb. Logovacie súbory sa ukladajú do priečinka `SimpleRecords.Server/logs`.
