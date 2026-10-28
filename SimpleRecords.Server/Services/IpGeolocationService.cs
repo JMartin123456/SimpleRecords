@@ -1,6 +1,7 @@
 
 using System.Net;
 using System.Text.Json;
+using System.Net.Http.Json;
 
 namespace SimpleRecords.Server.Services;
 
@@ -108,4 +109,130 @@ public class IpGeolocationService
         }
 
     }
+
+
+    public async Task<Dictionary<string, string?>> GetCountryCodesAsync(
+        IEnumerable<string?> ipAddresses)
+    {
+        var uniqueIps = ipAddresses
+            .Where(ip => !string.IsNullOrWhiteSpace(ip))
+            .Select(ip => ip!.Trim())
+            .Where(ip => IPAddress.TryParse(ip, out _))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var results = new Dictionary<string, string?>(
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var ip in uniqueIps)
+        {
+            results[ip] = null;
+        }
+
+        // Batch API prijíma najviac 100 adries v jednej dávke.
+        var batches = uniqueIps.Chunk(100).ToList();
+
+        for (var i = 0; i < batches.Count; i++)
+        {
+            // Bezplatné API má limit 15 požiadaviek za minútu.
+            // Medzi dávkami necháme rezervu.
+            if (i > 0)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(4));
+            }
+
+            var batch = batches[i];
+
+            try
+            {
+                var url =
+                    "http://ip-api.com/batch?fields=status,message,countryCode,query";
+
+                using var response = await _httpClient.PostAsJsonAsync(
+                    url,
+                    batch);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning(
+                        "IP geolokácia dávky zlyhala. HTTP status: {StatusCode}.",
+                        response.StatusCode);
+
+                    continue;
+                }
+
+                await using var stream =
+                    await response.Content.ReadAsStreamAsync();
+
+                using var document =
+                    await JsonDocument.ParseAsync(stream);
+
+                if (document.RootElement.ValueKind != JsonValueKind.Array)
+                {
+                    _logger.LogWarning(
+                        "IP geolokácia vrátila neočakávaný formát odpovede.");
+
+                    continue;
+                }
+
+                foreach (var item in document.RootElement.EnumerateArray())
+                {
+                    if (!item.TryGetProperty("query", out var queryElement) ||
+                        queryElement.ValueKind != JsonValueKind.String)
+                    {
+                        continue;
+                    }
+
+                    var query = queryElement.GetString();
+
+                    if (string.IsNullOrWhiteSpace(query) ||
+                        !results.ContainsKey(query))
+                    {
+                        continue;
+                    }
+
+                    if (!item.TryGetProperty("status", out var statusElement) ||
+                        statusElement.GetString() != "success")
+                    {
+                        _logger.LogWarning(
+                            "Krajinu sa nepodarilo zistiť pre jednu IP adresu.");
+
+                        continue;
+                    }
+
+                    if (item.TryGetProperty(
+                            "countryCode", out var countryElement))
+                    {
+                        var countryCode = countryElement.GetString();
+
+                        if (countryCode is { Length: 2 })
+                        {
+                            results[query] = countryCode.ToUpperInvariant();
+                        }
+                    }
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Nepodarilo sa kontaktovať IP geolocation API pre dávku.");
+            }
+            catch (TaskCanceledException ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Časový limit pri IP geolokácii dávky vypršal.");
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Odpoveď dávkovej IP geolokácie nie je platný JSON.");
+            }
+        }
+
+        return results;
+    }
+
 }

@@ -120,6 +120,8 @@ public class JsonImportService
             var skippedCount = 0;
             var recordNumber = 0;
 
+            var importedEmployees = new List<Employee>();
+
             foreach (var item in employees.EnumerateArray())
             {
                 recordNumber++;
@@ -207,6 +209,7 @@ public class JsonImportService
                         recordNumber);
                 }
 
+                /*
                 var countryCode = await _ipGeolocationService.GetCountryCodeAsync(ipaddress);
 
                 if (countryCode == null)
@@ -214,6 +217,7 @@ public class JsonImportService
                     _logger.LogWarning("Záznam č. {RecordNumber}: krajinu IP adresy sa nepodarilo zistiť.",
                         recordNumber);
                 }
+                */
 
                 var employee = new Employee();
 
@@ -222,12 +226,35 @@ public class JsonImportService
                 employee.BirthDate = parsedBirthDate;
                 employee.PositionID = foundPosition?.PositionID;
                 employee.IPaddress = ipaddress;
-                employee.IPCountryCode = countryCode;
+                //employee.IPCountryCode = countryCode;
+                employee.IPCountryCode = null;
 
                 _dbContext.Employees.Add(employee);
                 alreadyAdded.Add(employeeKey);
                 importedCount++;
             }
+
+            var countryCodes = await _ipGeolocationService
+                .GetCountryCodesAsync(
+                    importedEmployees.Select(e => e.IPaddress));
+
+            foreach (var employee in importedEmployees)
+            {
+                if (countryCodes.TryGetValue(
+                        employee.IPaddress,
+                        out var countryCode))
+                {
+                    employee.IPCountryCode = countryCode;
+                }
+
+                if (employee.IPCountryCode == null)
+                {
+                    _logger.LogWarning(
+                        "Krajinu IP adresy sa nepodarilo zistiť pre zamestnanca.");
+                }
+            }
+
+            _dbContext.Employees.AddRange(importedEmployees);
 
             await _dbContext.SaveChangesAsync();
             _logger.LogInformation("Import zamestnancov bol dokončený. Pridaných: {ImportedCount}, preskočených: {SkippedCount}.",

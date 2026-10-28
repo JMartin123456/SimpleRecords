@@ -1,8 +1,10 @@
 
 @page "/employees"
 @using SimpleRecords.Client.Models
+@using System.Net
 @inject HttpClient Http
 @inject IJSRuntime JS
+
 
 <PageTitle>Zamestnanci</PageTitle>
 
@@ -161,6 +163,16 @@ else
                     </div>
 
                     <div class="modal-body">
+                        @if (!string.IsNullOrWhiteSpace(editMessage))
+                        {
+                            <div class="alert @(editMessageIsSuccess
+                                ? "alert-success"
+                                : "alert-danger")"
+                                role="alert">
+                                @editMessage
+                            </div>
+                        }
+
                         <ValidationSummary />
 
                         <div class="mb-3">
@@ -239,6 +251,9 @@ else
     private Position[]? positions;
     private bool isSaving;
 
+    private string editMessage = string.Empty;
+    private bool editMessageIsSuccess;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadEmployees();
@@ -274,6 +289,9 @@ else
         var employee = employees?.FirstOrDefault(
             e => e.EmployeeID == employeeId);
 
+        editMessage = string.Empty;
+        editMessageIsSuccess = false;
+
         if (employee == null)
         {
             message = "Zamestnanca sa nepodarilo nájsť.";
@@ -298,9 +316,12 @@ else
         if (!isSaving)
         {
             editEmployee = null;
+            editMessage = string.Empty;
+            editMessageIsSuccess = false;
         }
     }
 
+    
     private async Task SaveEdit()
     {
         if (editEmployee == null)
@@ -308,15 +329,44 @@ else
             return;
         }
 
+        if (!IsValidPersonName(editEmployee.Name))
+        {
+            editMessage = "Meno obsahuje nepovolené znaky.";
+            editMessageIsSuccess = false;
+            return;
+        }
+
+        if (!IsValidPersonName(editEmployee.Surname))
+        {
+            editMessage = "Priezvisko obsahuje nepovolené znaky.";
+            editMessageIsSuccess = false;
+            return;
+        }
+
         if (editEmployee.BirthDate.HasValue &&
             editEmployee.BirthDate.Value.Date > DateTime.Today)
         {
-            message = "Dátum narodenia nemôže byť v budúcnosti.";
+            editMessage = "Dátum narodenia nemôže byť v budúcnosti.";
+            editMessageIsSuccess = false;
+            return;
+        }
+
+        if (editEmployee.BirthDate is null)
+        {
+            editMessage = "Zadaj dátum narodenia.";
+            editMessageIsSuccess = false;
+            return;
+        }
+
+        if (!IPAddress.TryParse(editEmployee.IPaddress.Trim(), out _))
+        {
+            editMessage = "Zadaj platnú IP adresu, napríklad 8.8.8.8 alebo 2001:4860:4860::8888.";
+            editMessageIsSuccess = false;
             return;
         }
 
         isSaving = true;
-        message = string.Empty;
+        editMessage = string.Empty;
 
         try
         {
@@ -326,33 +376,38 @@ else
 
             if (response.IsSuccessStatusCode)
             {
-                message = "Zamestnanec bol úspešne upravený.";
+                editMessage = "Zamestnanec bol úspešne upravený.";
+                editMessageIsSuccess = true;
+
                 selectedEmployee = null;
-                editEmployee = null;
 
                 await LoadEmployees();
 
-                await InvokeAsync(StateHasChanged);
+                // Modal zostane otvorený, aby používateľ videl správu.
+                // Zatvorí ho tlačidlom Zavrieť alebo Zrušiť.
             }
             else
             {
-                var error = await response.Content.ReadAsStringAsync();
-                message = $"Zmeny sa nepodarilo uložiť. {error}";
+                editMessage = "Zmeny sa nepodarilo uložiť. Skontroluj údaje a skús to znova.";
+                editMessageIsSuccess = false;
             }
         }
         catch (HttpRequestException)
         {
-            message = "Nepodarilo sa spojiť so serverom.";
+            editMessage = "Nepodarilo sa spojiť so serverom.";
+            editMessageIsSuccess = false;
         }
         catch (Exception)
         {
-            message = "Pri ukladaní nastala neočakávaná chyba.";
+            editMessage = "Pri ukladaní nastala neočakávaná chyba.";
+            editMessageIsSuccess = false;
         }
         finally
         {
             isSaving = false;
         }
     }
+
 
 
     private async Task DeleteEmployee(Employee employee)
@@ -386,5 +441,32 @@ else
         {
             message = "Nepodarilo sa spojiť so serverom.";
         }
+    }
+
+    private bool IsValidPersonName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        bool hasLetter = false;
+
+        foreach (char character in value.Trim())
+        {
+            if (char.IsLetter(character))
+            {
+                hasLetter = true;
+            }
+            else if (character != ' ' &&
+                    character != '-' &&
+                    character != '\'' &&
+                    character != '’')
+            {
+                return false;
+            }
+        }
+
+        return hasLetter;
     }
 }
